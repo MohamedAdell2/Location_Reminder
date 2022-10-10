@@ -9,7 +9,6 @@ import com.google.android.gms.location.GeofencingEvent
 import com.udacity.project4.locationreminders.data.ReminderDataSource
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.locationreminders.data.dto.Result
-import com.udacity.project4.locationreminders.data.local.RemindersLocalRepository
 import com.udacity.project4.locationreminders.reminderslist.ReminderDataItem
 import com.udacity.project4.utils.sendNotification
 import kotlinx.coroutines.*
@@ -37,43 +36,44 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
     override fun onHandleWork(intent: Intent) {
         Log.i("Geofence", "enque work recived")
         val geofenceEvent = GeofencingEvent.fromIntent(intent)
-        if (geofenceEvent!!.hasError()){
+        if (geofenceEvent!!.hasError()) {
             return
         }
-        if (geofenceEvent.geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER){
+        if (geofenceEvent.geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
 
-            if (geofenceEvent.triggeringGeofences!!.isNotEmpty()){
+            if (geofenceEvent.triggeringGeofences!!.isNotEmpty()) {
                 sendNotification(geofenceEvent.triggeringGeofences!!)
             }
         }
     }
 
     private fun sendNotification(triggeringGeofences: List<Geofence>) {
-        val requestId = if(triggeringGeofences.isNotEmpty()){
-            triggeringGeofences[0].requestId
-        }else{
-           Log.e("Notifcation" , "empty list")
+        if (triggeringGeofences.isEmpty()) {
+            Log.e("error", "The list is empty")
             return
         }
-        //Get the local repository instance
-        val remindersLocalRepository: ReminderDataSource by inject()
-        //Interaction to the repository has to be through a coroutine scope
-        CoroutineScope(coroutineContext).launch(SupervisorJob()) {
-            //get the reminder with the request id
-            val result = remindersLocalRepository.getReminder(requestId)
-            if (result is Result.Success<ReminderDTO>) {
-                val reminderDTO = result.data
-                //send a notification to the user with the reminder details
-                sendNotification(
-                    this@GeofenceTransitionsJobIntentService, ReminderDataItem(
-                        reminderDTO.title,
-                        reminderDTO.description,
-                        reminderDTO.location,
-                        reminderDTO.latitude,
-                        reminderDTO.longitude,
-                        reminderDTO.id
+        for (geofence in triggeringGeofences) {
+            val requestId = geofence.requestId
+            //Get the local repository instance
+            val remindersLocalRepository: ReminderDataSource by inject()
+            //Interaction to the repository has to be through a coroutine scope
+            CoroutineScope(coroutineContext).launch(SupervisorJob()) {
+                //get the reminder with the request id
+                val result = remindersLocalRepository.getReminder(requestId)
+                if (result is Result.Success<ReminderDTO>) {
+                    val reminderDTO = result.data
+                    //send a notification to the user with the reminder details
+                    sendNotification(
+                        this@GeofenceTransitionsJobIntentService, ReminderDataItem(
+                            reminderDTO.title,
+                            reminderDTO.description,
+                            reminderDTO.location,
+                            reminderDTO.latitude,
+                            reminderDTO.longitude,
+                            reminderDTO.id
+                        )
                     )
-                )
+                }
             }
         }
     }

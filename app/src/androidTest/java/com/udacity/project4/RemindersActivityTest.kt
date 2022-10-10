@@ -1,13 +1,18 @@
 package com.udacity.project4
 
+import android.app.Activity
 import android.app.Application
+import android.view.View
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.IdlingRegistry
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
@@ -15,7 +20,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.PointOfInterest
 import com.udacity.project4.locationreminders.RemindersActivity
 import com.udacity.project4.locationreminders.data.ReminderDataSource
-import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.locationreminders.data.local.LocalDB
 import com.udacity.project4.locationreminders.data.local.RemindersLocalRepository
 import com.udacity.project4.locationreminders.reminderslist.RemindersListViewModel
@@ -24,7 +28,10 @@ import com.udacity.project4.util.DataBindingIdlingResource
 import com.udacity.project4.util.monitorActivity
 import com.udacity.project4.utils.EspressoIdlingResource
 import kotlinx.coroutines.runBlocking
-import com.udacity.project4.locationreminders.data.dto.Result.Success
+import org.hamcrest.Matcher
+import org.hamcrest.Matchers
+import org.hamcrest.Matchers.`is`
+import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -35,10 +42,11 @@ import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import org.koin.test.AutoCloseKoinTest
 import org.koin.test.get
-import kotlin.test.assertEquals
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 @LargeTest
+@Config(sdk = [28])
 //END TO END test to black box test the app
 class RemindersActivityTest :
     AutoCloseKoinTest() {
@@ -111,16 +119,39 @@ class RemindersActivityTest :
         //check that snack bar is shown
         onView(withText(appContext.getString(R.string.err_enter_title)))
             .check(matches(isDisplayed()))
+        //wait till the snack bar disappear
+        onView(isRoot()).perform(waitFor(3000L))
         //write valid data for reminder
         onView(withId(R.id.reminderTitle)).perform(replaceText("test"))
         onView(withId(R.id.reminderDescription)).perform(replaceText("description"))
         saveViewModel.selectedPOI.postValue(
             PointOfInterest(LatLng(12.5 , 15.4),"id", "egypt"))
-        //save the value
+        //save the values
         onView(withId(R.id.saveReminder)).perform(click())
-
-
+        // Toast should displayed on screen
+        val decorView = getActivity(activityScenario).window.decorView
+        onView(withText(R.string.reminder_saved))
+            .inRoot(RootMatchers.withDecorView(not(decorView)))
+            .check(matches(isDisplayed()))
         //end the test
         activityScenario.close()
+    }
+
+    private fun waitFor(delay: Long): ViewAction {
+        return object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isRoot()
+            override fun getDescription(): String = "wait for $delay milliseconds"
+            override fun perform(uiController: UiController, v: View?) {
+                uiController.loopMainThreadForAtLeast(delay)
+            }
+        }
+    }
+
+    private fun getActivity(activityScenario: ActivityScenario<RemindersActivity>): Activity {
+        lateinit var activity: Activity
+        activityScenario.onActivity {
+            activity = it
+        }
+        return activity
     }
 }

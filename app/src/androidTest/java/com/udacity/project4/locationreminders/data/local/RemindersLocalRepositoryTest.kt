@@ -18,6 +18,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -80,5 +81,15 @@ class RemindersLocalRepositoryTest {
         //then check the list has size
         result as Result.Success
         assertEquals(2 ,result.data.size)
+    }
+
+    @Test
+    fun reminderNotFound () = runTest(UnconfinedTestDispatcher()){
+        //when trying to get reminder which is not in the data base
+        val result = repository.getReminder("125")
+        //then it should return error
+        assertFalse( result.succeeded)
+        result as Result.Error
+        assertEquals("Reminder not found!" , result.message)
     }
 }

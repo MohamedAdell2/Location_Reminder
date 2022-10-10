@@ -59,9 +59,9 @@ class RemindersListViewModelTest {
     @Test
     fun errorDataHandel() = runTest(UnconfinedTestDispatcher()){
         // check when there is an error the snack bar give error message
-        datasource.setReturnError(true)
+        datasource.setReturnError(FakeDataSource.ErrorType.NotFound)
         viewModel.loadReminders()
-        assertEquals("Error cant get data" , viewModel.showSnackBar.value)
+        assertEquals("Exception error" , viewModel.showSnackBar.value)
     }
 
 }
