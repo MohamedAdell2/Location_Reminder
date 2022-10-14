@@ -80,24 +80,25 @@ class SaveReminderFragment : BaseFragment() {
         }
 
         binding.saveReminder.setOnClickListener {
-                val title = _viewModel.reminderTitle.value
-                val description = _viewModel.reminderDescription.value
-                val location = _viewModel.reminderSelectedLocationStr.value
-                val latitude = _viewModel.latitude.value
-                val longitude = _viewModel.longitude.value
+            val title = _viewModel.reminderTitle.value
+            val description = _viewModel.reminderDescription.value
+            val location = _viewModel.reminderSelectedLocationStr.value
+            val latitude = _viewModel.latitude.value
+            val longitude = _viewModel.longitude.value
 
-                val reminderData = ReminderDataItem(
-                    title, description, location, latitude, longitude
-                )
+            _viewModel.reminderData = ReminderDataItem(
+                title, description, location, latitude, longitude
+            )
 
-                if (_viewModel.validateEnteredData(reminderData)) {
-                    checkPermissionsAndStartGeofence(reminderData)
-                }
+            if (_viewModel.validateEnteredData()) {
+                checkPermissionsAndStartGeofence()
+            }
         }
     }
 
     @SuppressLint("MissingPermission")
-    private fun createNewGeofence (data :ReminderDataItem){
+    private fun createNewGeofence (){
+        val data = _viewModel.reminderData
         val geofence = Geofence.Builder()
             .setRequestId(data.id)
             .setCircularRegion(data.latitude!!, data.longitude!!
@@ -145,10 +146,9 @@ class SaveReminderFragment : BaseFragment() {
         return foregroundLocation && backgroundLocationPermeation
     }
 
-    private fun checkPermissionsAndStartGeofence(reminder : ReminderDataItem) {
+    private fun checkPermissionsAndStartGeofence() {
         if (isPermissionGranted()){
             checkDeviceLocation()
-            createNewGeofence(reminder)
         }else{
             requestPermissions()
         }
@@ -165,25 +165,32 @@ class SaveReminderFragment : BaseFragment() {
         locationSettingsResponseTask.addOnFailureListener { exception ->
             if (exception is ResolvableApiException && resolve){
                 try {
-                    exception.startResolutionForResult(requireActivity(),
-                        REQUEST_TURN_DEVICE_LOCATION_ON)
+                    startIntentSenderForResult(exception.resolution.intentSender,
+                        REQUEST_TURN_DEVICE_LOCATION_ON,
+                        null, 0, 0, 0, null)
                 } catch (sendEx: IntentSender.SendIntentException) {
-                    Log.d("error", "Error getting location settings resolution: " + sendEx.message)
+                    Log.d("error", "Error getting location settings resolution: "
+                            + sendEx.message)
                 }
             } else {
                 Snackbar.make(
                     requireView(),
-                    R.string.location_required_error, Snackbar.LENGTH_INDEFINITE
+                    R.string.location_required_error,
+                    Snackbar.LENGTH_INDEFINITE
                 ).setAction(android.R.string.ok) {
                     checkDeviceLocation()
                 }.show()
             }
         }
+        locationSettingsResponseTask.addOnCompleteListener {
+            if (it.isSuccessful){
+                createNewGeofence()
+            }
+        }
     }
 
     private fun requestPermissions(){
-        ActivityCompat.requestPermissions(requireActivity()
-            ,arrayOf(
+        requestPermissions(arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ), REQUEST_FOREGROUND_LOCATION_CODE)
@@ -220,6 +227,7 @@ class SaveReminderFragment : BaseFragment() {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED){
                 Toast.makeText(requireContext()
                     , "Permission granted", Toast.LENGTH_SHORT).show()
+                checkDeviceLocation()
             } else {
                 Snackbar.make(requireView() ,
                     getString(R.string.snackbar_message), Snackbar.LENGTH_INDEFINITE)
